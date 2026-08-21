@@ -13,6 +13,27 @@ LOG_MODULE_REGISTER(demo, LOG_LEVEL_DBG);
 #define HIGH_PRIO 3
 #define COOP_PRIO (-1)
 
+volatile int counter = 0;
+
+#define INCREMENTS 1000000
+K_MUTEX_DEFINE(counter_mutex);
+
+void incrementer_thread(char *p1, void *p2, void *p3)
+{
+    for (int i = INCREMENTS; i > 0; i--) {
+        k_mutex_lock(&counter_mutex, K_FOREVER);
+        counter++;
+        k_mutex_unlock(&counter_mutex);
+    }
+    printk("Thread %s: counter = %d\n", p1, counter);
+}
+
+
+K_THREAD_DEFINE(incrementer1, STACK_SIZE, incrementer_thread,
+                "Incrementer 1", NULL, NULL, HIGH_PRIO, 0, 0);
+K_THREAD_DEFINE(incrementer2, STACK_SIZE, incrementer_thread,
+                "Incrementer 2", NULL, NULL, HIGH_PRIO, 0, 0);
+#if 0
 void t_low_fn(void *p1, void *p2, void *p3)
 {
     while (1) {
@@ -54,7 +75,6 @@ K_THREAD_DEFINE(t_high, STACK_SIZE, t_high_fn,
 K_THREAD_DEFINE(t_coop, STACK_SIZE, t_coop_fn,
                 NULL, NULL, NULL, COOP_PRIO, 0, 0);
 
-#if 0
 void thread_a_fn(void *p1, void *p2, void *p3)
 {
     while (1) {
