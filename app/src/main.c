@@ -65,6 +65,16 @@ static int total_events;
 static int total_wakeups;
 static int total_processed;
 
+void sensor_handler(struct k_work *work)
+{
+    ARG_UNUSED(work);
+    total_wakeups++;
+    total_processed++;
+    LOG_INF("[HANDLER] processed event %d  tick=%u",
+            total_processed, k_uptime_get_32());
+}
+K_WORK_DEFINE(sensor_work, sensor_handler);
+
 /* ------------------------------------------------------------------ */
 /*  sensor_sim - fires EVENT_COUNT events, 100ms apart               */
 /* ------------------------------------------------------------------ */
@@ -86,14 +96,16 @@ static void sensor_sim_fn(void *p1, void *p2, void *p3)
          *
          * Remove sensor_flag entirely once you do that.
          */
-        sensor_flag = true;
+        // sensor_flag = true;
 
+        k_work_submit(&sensor_work);
         /*
          * BONUS: Replace the single k_msleep(SENSOR_MS) above with
          * a burst of 5 rapid events, then use k_work_reschedule in
          * the handler to collapse them to one execution.
          */
     }
+    sensor_flag = true;
 
     LOG_INF("[SENSOR] all events produced");
 }
@@ -110,6 +122,7 @@ static void polling_fn(void *p1, void *p2, void *p3)
 {
     ARG_UNUSED(p1); ARG_UNUSED(p2); ARG_UNUSED(p3);
 
+#if 0
     while (total_processed < EVENT_COUNT) {
         k_msleep(POLL_MS);
         total_wakeups++;
@@ -125,6 +138,13 @@ static void polling_fn(void *p1, void *p2, void *p3)
             LOG_INF("[CONSUMER] processed event %d  wakeups_so_far=%d  tick=%u",
                     total_processed, total_wakeups,
                     k_uptime_get_32());
+        }
+    }
+#endif
+    while (true) {
+        k_msleep(100);
+        if (sensor_flag) {
+            break;
         }
     }
 
