@@ -6,7 +6,7 @@ LOG_MODULE_REGISTER(demo, LOG_LEVEL_DBG);
 
 #define STACK_SIZE       2048
 #define SENSOR_COUNT       18
-#define SENSOR_PERIOD_MS  150
+#define SENSOR_PERIOD_MS  100
 #define TEMP_ALARM_MC   27000
 
 /* ================================================================== */
@@ -34,19 +34,13 @@ ZBUS_LISTENER_DEFINE(display_lis, display_listener_cb);
  */
 ZBUS_MSG_SUBSCRIBER_DEFINE(logger_sub);
 
-/*
- * Alarm is a regular subscriber.
- * It receives channel notifications and then reads the latest value.
- */
-ZBUS_SUBSCRIBER_DEFINE(alarm_sub, 4);
-
 /* ================================================================== */
 /*  Channel                                                           */
 /* ================================================================== */
 
 ZBUS_CHAN_DEFINE(sensor_chan, struct sensor_data,
                  NULL, NULL,
-                 ZBUS_OBSERVERS(display_lis, logger_sub, alarm_sub),
+                 ZBUS_OBSERVERS(display_lis, logger_sub),
                  ZBUS_MSG_INIT(.temperature_mc = 0,
                                .timestamp_ms = 0,
                                .seq = 0));
@@ -147,49 +141,6 @@ static void logger_thread_fn(void *p1, void *p2, void *p3)
 }
 
 /* ================================================================== */
-/*  Subscriber - alarm                                                */
-/* ================================================================== */
-
-static void alarm_thread_fn(void *p1, void *p2, void *p3)
-{
-    ARG_UNUSED(p1); ARG_UNUSED(p2); ARG_UNUSED(p3);
-
-    k_thread_name_set(k_current_get(), "alarm");
-
-    const struct zbus_channel *chan;
-    int alarms = 0;
-
-    while (true) {
-        int ret = zbus_sub_wait(&alarm_sub, &chan, K_MSEC(3000));
-        if (ret != 0) {
-            LOG_INF("[ALARM-SUB] timeout, done");
-            break;
-        }
-
-        struct sensor_data msg;
-
-        ret = zbus_chan_read(chan, &msg, K_MSEC(100));
-        if (ret != 0) {
-            LOG_WRN("[ALARM-SUB] read failed ret=%d", ret);
-            continue;
-        }
-
-        if (msg.temperature_mc >= TEMP_ALARM_MC) {
-            alarms++;
-
-            LOG_WRN("[ALARM-SUB] HIGH TEMP seq=%u temp=%d mC alarms=%d",
-                    msg.seq,
-                    msg.temperature_mc,
-                    alarms);
-        } else {
-            LOG_INF("[ALARM-SUB] ok seq=%u temp=%d mC",
-                    msg.seq,
-                    msg.temperature_mc);
-        }
-    }
-}
-
-/* ================================================================== */
 /*  Threads                                                           */
 /* ================================================================== */
 
@@ -197,9 +148,6 @@ K_THREAD_DEFINE(sensor_thread, STACK_SIZE, sensor_thread_fn,
                 NULL, NULL, NULL, 5, 0, 0);
 
 K_THREAD_DEFINE(logger_thread, STACK_SIZE, logger_thread_fn,
-                NULL, NULL, NULL, 6, 0, 0);
-
-K_THREAD_DEFINE(alarm_thread, STACK_SIZE, alarm_thread_fn,
                 NULL, NULL, NULL, 6, 0, 0);
 
 /* ================================================================== */
